@@ -7,11 +7,12 @@ processSprayAngle = false;
 processSMD = true;
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-filePath = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\1_1_4_4_80bar.mraw';
-backgroundPath = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\background.mraw';
-outputPath16 = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\avgMonoSubFrame.tif';
-outputPathBW = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\avgMonoSubFrameBW.tif';
-gifPath = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\bitshift.gif';
+folder = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
+filePath = append(folder,'1_1_4_4_80bar.mraw');
+backgroundPath = append(folder,'background.mraw');
+outputPath16 = append(folder, 'avgMonoSubFrame.tif');
+outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
+gifPath = append(folder,'bitshift.gif');
 frameDelay = 0.005; % delay between frames in seconds (for plotting)
 visualFrames = 50; % number of frames to display in MATLAB plot (from start frame of flow)
 chunkSize = 100; % allocation for efficiency 
@@ -33,6 +34,7 @@ pintley = 200; % For cropping out pintle
 % SMD
 frameNoSMD = 400; % Frame number to analyse SMD
 maxSMD = 2; % Max SMD to plot for histogram, mm
+percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -212,7 +214,6 @@ end
 %% SMD
 
 if processSMD == true
-    percentileThresholdSMD = 40; % threshold for detecting spray, SMD
     
     frame = readmraw(filePath, frameNoSMD);
     frameMono = double(frame(:,:,monoChannel));
@@ -276,7 +277,15 @@ if processSMD == true
     title("Particle Diameter Distribution")
     xlabel("SMD, mm")
     ylabel("Occurrences")
-
+    
+    % Overlay cluster image on the background-subtracted frame
+    figure;
+    imshow(frameMonoNorm, []); hold on;
+    % Create a binary mask for the cluster image
+    clusterMask = clusterImage > 0; 
+    % Overlay red outlines for the clusters
+    visboundaries(clusterMask, 'Color', 'r', 'LineWidth', 1);
+    title('Cluster Image Overlay on Background-Subtracted Frame');
 end
 
 %% Plotting
