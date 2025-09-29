@@ -3,8 +3,7 @@ clear all; close all; clc;
 %% --- User settings ---
 % Toggle features
 processGif = false;
-processSprayAngle = false;
-processSMD = true;
+processSprayAngle = true;
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
 folder = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
@@ -30,11 +29,6 @@ yDetect = [150, 200];   % pintle spray angle measured two lines at these coordin
 rowMid = 50; % y-coordinate for detecting pintle center
 epsVal = 1e-6; % Background division epsilon value
 pintley = 200; % For cropping out pintle
-
-% SMD
-frameNoSMD = 400; % Frame number to analyse SMD
-maxSMD = 2; % Max SMD to plot for histogram, mm
-percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -209,83 +203,6 @@ if processSprayAngle == true
         title(sprintf('Spray Angle = %.2f°', sprayAngle));
         legend()
     end
-end
-
-%% SMD
-
-if processSMD == true
-    
-    frame = readmraw(filePath, frameNoSMD);
-    frameMono = double(frame(:,:,monoChannel));
-    frameMonoNorm = mat2gray(frameMono);
-
-    % Subtract background
-    frameMonoNorm = frameMonoNorm ./ mat2gray(bgMono);
-
-    figure();
-    imshow(frameMonoNorm);
-
-    % Crop out pintle
-    frameMonoNorm = frameMonoNorm(pintley:end,:);
-
-    % Binarise image
-    % Compute threshold based on percentile of pixel intensities
-    threshVal = prctile(frameMonoNorm(:), percentileThresholdSMD);
-    frameBW = frameMonoNorm < threshVal;
-
-    figure;
-    imshow(frameBW);
-
-    % Clustering
-    % Initialize label matrix
-    [labelMatrix, numLabels] = bwlabel(frameBW, 8); % 8-connectivity
-    % Display the labeled image with a custom colormap (zero as black)
-    figure;
-    imshow(labelMatrix, []);
-    title(['Labeled Image with ', num2str(numLabels), ' Regions']);
-    colormap([0 0 0; hsv(numLabels)]); % Apply custom colormap with zero as black
-    colorbar; % Add colorbar for reference
-
-    % Calculate SMD
-    cellCounts = zeros(numLabels, 1); % Initialize array to hold cell counts
-    cellEffDia = zeros(numLabels, 1); % Initialize array to hold effective cell diameters
-    for i = 1:numLabels
-        cellCounts(i) = sum(labelMatrix(:) == i); % Count number of pixels in each cluster
-        cellEffDia(i) = sqrt(4*cellCounts(i)/pi)*pixelSize_mm; % Convert to effective cell dia (eq to circle), in mm
-    end
-
-    % Create an image of the clusters colored by effective cell diameter
-    clusterImage = zeros(size(frameBW, 1), size(frameBW, 2)); % Initialize image
-    for i = 1:numLabels
-        if cellEffDia(i) < maxSMD
-            clusterImage(labelMatrix==i) = cellEffDia(i);
-        else
-            clusterImage(labelMatrix==i) = 0;
-        end
-    end
-
-    figure;
-    imshow(clusterImage, []);
-    colormap([0 0 0; parula(numLabels)]);
-    SMDcolorbar=colorbar; % Add colorbar for reference
-    SMDcolorbar.Label.String = "SMD, mm";
-    
-    figure;
-    binsSMD = maxSMD/(4/pi*pixelSize_mm);
-    SMDedges = linspace(0,maxSMD,binsSMD);
-    histogram(cellEffDia,"BinEdges",SMDedges)
-    title("Particle Diameter Distribution")
-    xlabel("SMD, mm")
-    ylabel("Occurrences")
-    
-    % Overlay cluster image on the background-subtracted frame
-    figure;
-    imshow(frameMonoNorm, []); hold on;
-    % Create a binary mask for the cluster image
-    clusterMask = clusterImage > 0; 
-    % Overlay red outlines for the clusters
-    visboundaries(clusterMask, 'Color', 'r', 'LineWidth', 1);
-    title('Cluster Image Overlay on Background-Subtracted Frame');
 end
 
 %% Plotting
