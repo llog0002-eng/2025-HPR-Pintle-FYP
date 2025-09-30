@@ -3,17 +3,17 @@ clear all; close all; clc;
 %% --- User settings ---
 processGif = true;
 processSprayAngle = true;
-
+allFrames = false;
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
 folder = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\';
-filePath = append(folder,'1_1_4_4_80bar.mraw');
+filePath = append(folder,'1_1_3_1_60bar.mraw');
 backgroundPath = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\1_1_3_1_60bar.mraw';
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
 
-frameDelay = 0.005;
-visualFrames = 50;
+frameDelay = 0.00005;
+visualFrames = 500;
 chunkSize = 100;
 
 sigmaSmooth = 1;
@@ -36,37 +36,62 @@ frameWidth = 1024; frameHeight = 640; numChannels = 3; bitDepth = 12;
 
 thresholdDarkFraction = 0.08;
 startFrame = 1;
-maxFrames = 200;
+maxFrames = 500;
 
 %% --- Load background ---
 bgData = double(readmraw(backgroundPath, backgroundFrame));
 bgMono = bgData(:,:,monoChannel);
 
-%% --- Detect first flow frame ---
-firstFlowFrame = NaN;
-for f = startFrame:maxFrames
-    I = double(readmraw(filePath, f));
-    I_mono = I(:,:,monoChannel) ./ (bgMono + epsVal);  % background division
+startFrame = 1;             
 
-    % Fraction of dark pixels (indicates flow)
-    darkFraction = sum(I_mono(:) < 0.95) / numel(I_mono);
+if allFrames
+    startFrame = 1;  % start from the first frame
+    I = double(readmraw(filePath, startFrame));
+    Ibright = uint16(I);
+    Ibright = bitshift(Ibright, bitshiftAmount);
+    Ibright(Ibright > maxPixelValue) = maxPixelValue;
 
-    if darkFraction > thresholdDarkFraction
-        firstFlowFrame = f;
-        disp(['Flow detected at frame: ', num2str(firstFlowFrame)]);
-        break;
+    % Convert to grayscale
+    Igray = uint8(255 * mat2gray(rgb2gray(Ibright)));
+
+    h = imshow(Igray); % initial display
+    title(sprintf('Frame %d', startFrame)); % initial frame title
+    imwrite(Igray, gifPath, 'gif', 'LoopCount', Inf, 'DelayTime', frameDelay); % first frame
+
+    for i = startFrame+1 : startFrame + visualFrames - 1
+        I = double(readmraw(filePath, i));
+        Ibright = uint16(I);
+        Ibright = bitshift(Ibright, bitshiftAmount);
+        Ibright(Ibright > maxPixelValue) = maxPixelValue;
+
+        Igray = uint8(255 * mat2gray(rgb2gray(Ibright)));
+
+        set(h, 'CData', Igray);
+        title(sprintf('Frame %d', i)); % update title with current frame
+        drawnow;
     end
+
+    disp(['Preview GIF saved to: ', gifPath]);
 end
 
-if isnan(firstFlowFrame)
-    disp('No flow detected in the scanned frames.');
-    firstFlowFrame = startFrame; % fallback
-end
+% --- User-defined parameters ---
+startFrame = 1;        % first frame to check
+maxFrames = 400;         % last frame to check
+frameJump = 1;           % jump for forward search (e.g., check every 5 frames)
+numBgFrames = 200;        % number of frames to use for background variance
+sigmaFactor = 2;         % threshold = mean + 3*std
+maxPixelValue = 4095;    % 12-bit camera max value
+monoChannel = 1;         % 1=Red, 2=Green, 3=Blue
+
+exactFlowFrame = detectFlowFrames(filePath, monoChannel, startFrame, maxFrames, sigmaFactor, maxPixelValue);
+
+disp(['Flow starts at frame: ', num2str(exactFlowFrame)]);
+
 
 %% --- Display GIF (optional) ---
 if processGif
 
-    frame_start = firstFlowFrame;  % use detected flow start
+    frame_start = exactFlowFrame-10;  % use detected flow start
     I = double(readmraw(filePath, frame_start));
     Ibright = uint16(I);
     Ibright = bitshift(Ibright, bitshiftAmount);
@@ -160,19 +185,26 @@ if processSprayAngle
 
     % Average over all frames
     avgMono = accumMono / numFrames;
+%% --- Crop the averaged image like before ---
+avgMonoCropped = avgMono(yBottom:end, :);
+pct = 35; 
+thresh = prctile(avgMonoCropped(:), pct);
+BW_core = avgMonoCropped > thresh; 
 
-    %% --- Sauvola Binarization ---
-    window = [51 51];
-    k = 0.15;
+window = [51 51];
+k = 0.1;
+BW_edges = sauvolaSingle(avgMonoCropped, window, k);
+BW_edges = bwareaopen(BW_edges, minPixelSize);
+BW_clean= BW_core & BW_edges;
 
-    avgMonoCropped = avgMono(yBottom:end, :);
-    avgMonoBW_cropped = sauvolaSingle(avgMonoCropped, window, k);
-    BW_clean = bwareaopen(avgMonoBW_cropped, minPixelSize);
+figure;
+imshow(BW_clean, []);
+title('Combined threshold')
 
-    figure;
-    imshow(BW_clean, []);
-    title('Single-Stage Sauvola Binarization');
 
+%% --- Save combined mask ---
+imwrite(BW_clean, 'avgMonoHybridMask.jpg');
+disp('Hybrid mask saved as avgMonoHybridMask.jpg');
     %% --- Edge detection ---
     edgesCanny = edge(BW_clean, 'Canny', [], 1);
     edgesCannyClean = bwareaopen(edgesCanny, 20);
@@ -229,7 +261,7 @@ rectangle('Position', [1, yROI_start, frameWidth, yROI_end - yROI_start + 1], ..
 %% --- Subplot 3: Binary mask overlay ---
 subplot(2,2,3);
 imshow(avgMono, []);  % show background-subtracted averaged image
-title('Binary Mask (Sauvola)');
+title('Binarised mask')
 hold on;
 
 % Pad BW_clean back to full image size
@@ -268,8 +300,6 @@ function BW = sauvolaSingle(I, window, k)
 % window : [M N] neighborhood (default [3 3])
 % k : Sauvola sensitivity (default 0.34)
 
-
-
 if nargin < 3
     k = 0.34;
 end
@@ -278,7 +308,7 @@ if nargin < 2
 end
 
 % Ensure input is 2D
-if ndims(I) ~= 2
+if ~ismatrix(I)
     error('Input image must be a 2D array.');
 end
 
