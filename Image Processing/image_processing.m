@@ -6,7 +6,7 @@ processGif = false;
 processSprayAngle = true;
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-folder = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
+folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
 filePath = append(folder,'1_1_4_4_80bar.mraw');
 backgroundPath = append(folder,'background.mraw');
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');

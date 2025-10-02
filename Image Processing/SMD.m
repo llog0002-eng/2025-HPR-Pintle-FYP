@@ -3,7 +3,7 @@ clear all; close all; clc;
 %% --- User settings ---
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-folder = 'A:\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
+folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
 filePath = append(folder,'1_1_4_4_80bar.mraw');
 backgroundPath = append(folder,'background.mraw');
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
@@ -31,6 +31,15 @@ pintley = 450; % For cropping out pintle
 frameNoSMD = 400; % Frame number to analyse SMD
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
+connectivity = 4;
+
+% Cropping inputs
+% Crop to region of interest (ROI)
+cropHeight = 100; 
+cropWidth  = 100;
+
+yCenter = 500; % adjust as needed (towards bottom of 191 px image)
+xCenter = 512; % roughly center of 1024 px wide image
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -88,20 +97,23 @@ frameMonoNorm = mat2gray(frameMono);
 % Subtract background
 frameMonoNorm = frameMonoNorm ./ mat2gray(bgMono);
 
-% Crop out pintle
-frameMonoNorm = frameMonoNorm(pintley:end,:);
+% Cropping
+y1 = max(1, round(yCenter - cropHeight/2));
+y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
+x1 = max(1, round(xCenter - cropWidth/2));
+x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
+
+frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
+bg = bgMono(y1:y2,x1:x2);
 
 % Binarise image
 % Compute threshold based on percentile of pixel intensities
 threshVal = prctile(frameMonoNorm(:), percentileThresholdSMD);
 frameBW = frameMonoNorm < threshVal;
 
-
-
 % Clustering
 % Initialize label matrix
-[labelMatrix, numLabels] = bwlabel(frameBW, 8); % 8-connectivity
-
+[labelMatrix, numLabels] = bwlabel(frameBW, connectivity); % 4-connectivity
 
 % Calculate SMD
 cellCounts = zeros(numLabels, 1); % Initialize array to hold cell counts
@@ -195,9 +207,6 @@ I_gray = im2double(im2gray(frame));        % convert
 I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.01); 
 I_gray = adapthisteq(I_gray);  % optional CLAHE
 
-% Estimate background
-bg = imgaussfilt(I_gray, 15);
-
 % Compute enhancement without scaling
 I_enhanced = bg - I_gray;       % droplets are positive
 I_enhanced(I_enhanced < 0) = 0; % clip negatives
@@ -207,23 +216,22 @@ I_enhanced = I_enhanced * 5;    % boost contrast without scaling to 1
 I_enhanced(I_enhanced > 1) = 1;
 
 % Adaptive threshold
-T = adaptthresh(I_enhanced, 0.4, 'ForegroundPolarity','bright', 'NeighborhoodSize', 29);
+T = adaptthresh(I_enhanced, 0.5, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
 BW = imbinarize(I_enhanced, T);
 
 % Clean mask
-BW = bwareaopen(BW, 1);  % remove only single-pixel noise
+BW = bwareaopen(BW, 2);  % remove small noise
 BW = imfill(BW, 'holes');
-
 
 % Step 2: Edge detection using Canny
 %BW = edge(I_smooth, 'Canny', [0.05 0.2]);
 
 % Step 3: Morphological cleanup
-BW_clean = bwareaopen(BW, 3);   % Remove small objects
+BW_clean = bwareaopen(BW, 2);   % Remove small objects
 BW_clean = imfill(BW_clean, 'holes');
 
 % Step 4: Label droplets
-CC = bwconncomp(BW_clean);
+CC = bwconncomp(BW_clean,connectivity);
 
 % Step 5: Measure droplet properties
 stats = regionprops(CC, 'Area', 'Centroid', 'BoundingBox');
@@ -242,24 +250,29 @@ fprintf('Estimated Sauter Mean Diameter (SMD) = %.2f mm.\n', SMDs*pixelSize_mm);
 %% Plotting
 
 figure('Name','Droplet Analysis','NumberTitle','off');
-t = tiledlayout(4,1,'Padding','compact','TileSpacing','compact'); % 4 images, compact spacing
+t = tiledlayout(3,2,'Padding','compact','TileSpacing','compact'); % 4 images, compact spacing
 
-% 1) Original (cropped) frame
+% Original (cropped) frame
 nexttile;
 imshow(frame); 
 title('Original Cropped Frame');
 
-% 2) Enhanced Image
+% Enhanced Image
 nexttile;
 imshow(I_enhanced); 
 title('Enhanced Image');
 
-% 3) Binary Mask
+% Threshold
+nexttile;
+imshow(T);
+title("Threshold")
+
+% Binary Mask
 nexttile;
 imshow(BW);
 title('Binary Mask');
 
-% 4) Original Frame with Centroids
+% Original Frame with Centroids
 nexttile;
 imshow(frame); 
 hold on;
