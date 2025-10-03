@@ -4,8 +4,9 @@ clear all; close all; clc;
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
 folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
-filePath = append(folder,'1_1_4_4_80bar.mraw');
-backgroundPath = append(folder,'background.mraw');
+datafolder = 'C:\Users\Luke''s Laptop\Downloads\';
+filePath = append(datafolder,'1_3_1_1_80bar.mraw');
+pintlePath = append(datafolder,'1_3_1_1_80bar.mraw');
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -13,10 +14,13 @@ frameDelay = 0.005; % delay between frames in seconds (for plotting)
 visualFrames = 50; % number of frames to display in MATLAB plot (from start frame of flow)
 chunkSize = 100; % allocation for efficiency 
 percentileThresholdAng = 45; % threshold for detecting spray, spray angle
+pixelSize_mm = 0.05;
 
 sigmaSmooth = 1;
+startFrame = 4;
+sigmaFactor = 3;
 backgroundFrame = 1; % frame to detect background
-frame_start = 100; % frame to detect initial flow through pintle
+frame_start = 200; % frame to detect initial flow through pintle
 maxFrames = 200; % maximum number of frames to sample (from initial flow)
 bitshiftAmount = 2; % used for visualisation of the pintle in GIF
 maxPixelValue = 4095; % 12-bit max
@@ -28,18 +32,17 @@ epsVal = 1e-6; % Background division epsilon value
 pintley = 450; % For cropping out pintle
 
 % SMD
-frameNoSMD = 400; % Frame number to analyse SMD
+frameNoSMD = 500; % Frame number to analyse SMD
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
 
 % Cropping inputs
 % Crop to region of interest (ROI)
-cropHeight = 100; 
-cropWidth  = 100;
-
-yCenter = 500; % adjust as needed (towards bottom of 191 px image)
-xCenter = 512; % roughly center of 1024 px wide image
+cropHeight = 200; 
+cropWidth  = 200;
+yCenter = 500;
+xCenter = 150;
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -48,11 +51,13 @@ frameWidth = 1024; frameHeight = 640; numChannels = 3; bitDepth = 12;
 
 %% Background
 
-% --- Read background frame ---
-bgData = double(readmraw(filePath, backgroundFrame));
-bgMono = bgData(:,:,monoChannel);
+%exactFlowFrame = detectFlowFrames(filePath, monoChannel, startFrame, maxFrames, sigmaFactor, maxPixelValue);
 
-bwPost = bgMono < background_threshold*max(bgMono(:)); % thresholds maximum values in background image
+% --- Read background frame ---
+bgData = double(readmraw(pintlePath, 1));
+pintleMono = bgData(:,:,monoChannel);
+
+bwPost = pintleMono < background_threshold*max(pintleMono(:)); % thresholds maximum values in background image
 bwPost = imfill(bwPost,'holes'); 
 bwPost = bwareaopen(bwPost,50); 
 
@@ -76,7 +81,7 @@ disp(['Detected pintle center at (X, Y) = (', num2str(centerX), ', ', num2str(ce
 
 
 pintleWidthPixels = endIdx - startIdx;  % width of pintle in pixels
-pixelSize_mm = pintleDiameter_mm / pintleWidthPixels;
+%pixelSize_mm = pintleDiameter_mm / pintleWidthPixels;
 disp(['Pixel size: ', num2str(pixelSize_mm), ' mm/pixel']);
 
 %% File info
@@ -90,21 +95,28 @@ disp(['Total frames used: ', num2str(numFrames)]);
 
 %% Thresholding
 
+bg = readmraw(filePath, backgroundFrame);
+bgMono = double(bg(:,:,monoChannel));
+bgMonoNorm = mat2gray(bgMono);
+bg = bgMonoNorm;
+
 frame = readmraw(filePath, frameNoSMD);
 frameMono = double(frame(:,:,monoChannel));
 frameMonoNorm = mat2gray(frameMono);
 
+% % Cropping
+% y1 = max(1, round(yCenter - cropHeight/2));
+% y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
+% x1 = max(1, round(xCenter - cropWidth/2));
+% x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
+% 
+% frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
+% bg = bg(y1:y2,x1:x2);
+
+
+
 % Subtract background
-frameMonoNorm = frameMonoNorm ./ mat2gray(bgMono);
-
-% Cropping
-y1 = max(1, round(yCenter - cropHeight/2));
-y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
-x1 = max(1, round(xCenter - cropWidth/2));
-x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
-
-frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
-bg = bgMono(y1:y2,x1:x2);
+frameMonoNorm = frameMonoNorm ./ bg;
 
 % Binarise image
 % Compute threshold based on percentile of pixel intensities
@@ -137,7 +149,7 @@ end
 
 % % Display background image
 % figure('Name','Raw Background Image','NumberTitle','off');
-% imshow(mat2gray(bgMono));
+% imshow(mat2gray(pintleMono));
 % title('Raw Background Image');
 
 % % Display row data
@@ -150,7 +162,7 @@ end
 % figure('Name','Thresholded Background (Pintle Detection)','NumberTitle','off');
 % imshow(bwPost); hold on;
 % rectangle('Position', pintleBox, 'EdgeColor', 'c', 'LineWidth', 2);
-% yVals = 1:size(bgMono,1);
+% yVals = 1:size(pintleMono,1);
 % plot(centerX*ones(size(yVals)), yVals, 'b--', 'LineWidth', 2);
 % text(centerX+5, centerY, 'Pintle Center', 'Color', 'y', 'FontSize', 12);
 % title('Thresholded Background with Pintle Center');
@@ -208,19 +220,18 @@ I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.01);
 I_gray = adapthisteq(I_gray);  % optional CLAHE
 
 % Compute enhancement without scaling
-I_enhanced = bg - I_gray;       % droplets are positive
-I_enhanced(I_enhanced < 0) = 0; % clip negatives
-I_enhanced = I_enhanced * 5;    % boost contrast without scaling to 1
+I_enhanced = 1 - I_gray; % Droplets are white
+I_enhanced(I_gray < 0) = 0; % clip negatives
 
 % Clip extreme values to avoid saturation
 I_enhanced(I_enhanced > 1) = 1;
 
 % Adaptive threshold
-T = adaptthresh(I_enhanced, 0.5, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
+T = adaptthresh(I_enhanced, 0.2, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
 BW = imbinarize(I_enhanced, T);
 
 % Clean mask
-BW = bwareaopen(BW, 2);  % remove small noise
+BW = bwareaopen(BW, 4);  % remove small noise
 BW = imfill(BW, 'holes');
 
 % Step 2: Edge detection using Canny
