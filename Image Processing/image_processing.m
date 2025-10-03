@@ -12,6 +12,10 @@ outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
 
+frameDelay = 0.01;
+visualFrames = 50;
+chunkSize = 100;
+
 sigmaSmooth = 1;
 backgroundFrame = 1;
 maxFrames = 500;
