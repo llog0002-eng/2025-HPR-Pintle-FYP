@@ -5,9 +5,9 @@ processGif = false;
 processSprayAngle = true;
 allFrames = false;
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-folder = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\';
-filePath = append(folder,'1_1_4_2_70bar.mraw');
-backgroundPath = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\1_1_3_1_60bar.mraw'; % DO NOT CHANGE
+folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
+filePath = append(folder,'1_1_4_4_80bar.mraw');
+backgroundPath = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\1_1_4_4_80bar.mraw';
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -20,7 +20,6 @@ sigmaSmooth = 1;
 backgroundFrame = 1;
 maxFrames = 1000;
 bitshiftAmount = 2;
-maxPixelValue = 4095;
 pintleDiameter_mm = 25;
 background_threshold = 0.009;
 
