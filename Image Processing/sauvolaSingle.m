@@ -17,8 +17,8 @@ end
 I = double(I);
 
 % Compute local mean and standard deviation using averagefilter
-m  = averagefilter(I, window, 'replicate');
-m2 = averagefilter(I.^2, window, 'replicate');
+m  = averagefilter(I, window, 'symmetric');
+m2 = averagefilter(I.^2, window, 'symmetric');
 s  = (m2-m.^2).^0.5;
 
 % Sauvola threshold

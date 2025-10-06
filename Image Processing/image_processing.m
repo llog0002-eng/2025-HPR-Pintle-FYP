@@ -4,10 +4,10 @@ clear all; close all; clc;
 processGif = false;
 processSprayAngle = true;
 allFrames = false;
-monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
-filePath = append(folder,'1_1_4_4_80bar.mraw');
-backgroundPath = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\1_1_4_4_80bar.mraw';
+monoChannel = 2;  % 1=Red, 2=Green, 3=Blue
+folder = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\';
+filePath = append(folder,'1_1_4_2_70bar.mraw');
+backgroundPath = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\1_1_3_1_60bar.mraw'; % DO NOT CHANGE
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -20,11 +20,12 @@ sigmaSmooth = 1;
 backgroundFrame = 1;
 maxFrames = 1000;
 bitshiftAmount = 2;
+maxPixelValue = 4095;
 pintleDiameter_mm = 25;
 background_threshold = 0.009;
 
 % Distances from the pintle tip for spray angle calculation
-distances_mm = [10, 20];
+distances_mm = [5, 15];
 
 % Flow detection settings
 sigmaFactor = 0.008; % DO NOT CHANGE 
@@ -158,12 +159,12 @@ if processSprayAngle
     for f = exactFlowFrame:chunkSize:numFrames
         endFrame = min(f + chunkSize - 1, numFrames);
         I_chunk = readmraw(filePath, [f endFrame]);
-        monoChunk = double(I_chunk(:,:,monoChannel,:)) ./ (bgMono + epsVal);
+        monoChunk = double(I_chunk(:,:,monoChannel,:)) ./ (bgMono);
         accumMono = accumMono + sum(monoChunk, 4);
     end
 
     avgMono = accumMono / numFrames;
-    avgMonoCropped = avgMono(yBottom:end, :);
+    avgMonoCropped = imadjust((avgMono(yBottom:end, :)));
 
     BW_sauvola = sauvolaSingle(avgMonoCropped, [windowSize windowSize], kValue);
     BW_inv = ~BW_sauvola;
