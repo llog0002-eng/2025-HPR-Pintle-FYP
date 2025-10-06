@@ -32,8 +32,9 @@ epsVal = 1e-6; % Background division epsilon value
 pintley = 450; % For cropping out pintle
 
 % SMD
-frameNoSMD = 600; % Frame number to analyse SMD
-
+frameNoSMDstart = 600; % Frame number to start analysing droplets
+frameNoSMDstep = 10; % Frames to step between droplet analysis
+frameNoSMDend = 700; % Frame number to stop analysing droplets
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
@@ -43,14 +44,14 @@ connectivity = 4;
 cropHeight = 400; 
 cropWidth  = 400;
 yCenter = 300;
-xCenter = 250;
+xCenter = 550;
 
 % Camera settings (only used for determine info in command window not used
 % in script)
 
 frameWidth = 1024; frameHeight = 640; numChannels = 3; bitDepth = 12;
 
-%% Background
+%% Pintle Post Detection
 
 %exactFlowFrame = detectFlowFrames(filePath, monoChannel, startFrame, maxFrames, sigmaFactor, maxPixelValue);
 
@@ -94,137 +95,80 @@ disp(['Total frames used: ', num2str(numFrames)]);
 
 %% Thresholding
 
-bg = readmraw(filePath, backgroundFrame);
-bgMono = double(bg(:,:,monoChannel));
-bgMonoNorm = mat2gray(bgMono);
-bg = bgMonoNorm;
+% Preallocate results:
+frames = zeros([cropWidth,cropHeight]);
+I_enhanceds = zeros([cropWidth,cropHeight]);
+BWs = zeros([cropWidth,cropHeight]);
 
-frame = readmraw(filePath, frameNoSMD);
-frameMono = double(frame(:,:,monoChannel));
-frameMonoNorm = mat2gray(frameMono);
+n = (frameNoSMDend - frameNoSMDstart)/frameNoSMDstep + 1;
+dropletDiameters = NaN([1000,n]); % Preallocate NaNs to not use preallocation values
+dropletAreas = NaN([1000,n]); % Preallocate NaNs to not use preallocation values
 
-% Cropping
-y1 = max(1, round(yCenter - cropHeight/2));
-y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
-x1 = max(1, round(xCenter - cropWidth/2));
-x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
+% For each frame being analysed:
+for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
+    j = (i-frameNoSMDstart)/frameNoSMDstep+1; % Frame index
 
-frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
-bg = bg(y1:y2,x1:x2);
-
-% Subtract background
-frameMonoNorm = frameMonoNorm ./ bg;
-
-% Binarise image
-% Compute threshold based on percentile of pixel intensities
-threshVal = prctile(frameMonoNorm(:), percentileThresholdSMD);
-frameBW = frameMonoNorm < threshVal;
-
-%% Plotting
-
-% % Display background image
-% figure('Name','Raw Background Image','NumberTitle','off');
-% imshow(mat2gray(pintleMono));
-% title('Raw Background Image');
-
-% % Display row data
-% figure('Name','Row Data Visualization','NumberTitle','off');
-% plot(rowData,'LineWidth',2); ylim([-0.1 1.1]);
-% xlabel('X [pixels]'); ylabel('Pixel Value (0=black, 1=white)');
-% title(['Row Data at Y = ', num2str(rowMid)]);
-
-% % Display pintle detection:
-% figure('Name','Thresholded Background (Pintle Detection)','NumberTitle','off');
-% imshow(bwPost); hold on;
-% rectangle('Position', pintleBox, 'EdgeColor', 'c', 'LineWidth', 2);
-% yVals = 1:size(pintleMono,1);
-% plot(centerX*ones(size(yVals)), yVals, 'b--', 'LineWidth', 2);
-% text(centerX+5, centerY, 'Pintle Center', 'Color', 'y', 'FontSize', 12);
-% title('Thresholded Background with Pintle Center');
-% axis on; axis image; xlabel('X [pixels]'); ylabel('Y [pixels]'); grid on;
-
-% % Display background subtracted frame:
-% figure();
-% imshow(frameMonoNorm);
-
-% % Display binarised frame:
-% figure;
-% imshow(frameBW);
-
-% % Display the labeled image with a custom colormap (zero as black)
-% figure;
-% imshow(labelMatrix, []);
-% title(['Labeled Image with ', num2str(numLabels), ' Regions']);
-% colormap([0 0 0; hsv(numLabels)]); % Apply custom colormap with zero as black
-% colorbar; % Add colorbar for reference
-
-% figure;
-% imshow(clusterImage, []);
-% colormap([0 0 0; parula(numLabels)]);
-% SMDcolorbar=colorbar; % Add colorbar for reference
-% SMDcolorbar.Label.String = "SMD, mm";
-
-% figure;
-% binsSMD = maxSMD/(4/pi*pixelSize_mm);
-% SMDedges = linspace(0,maxSMD,binsSMD);
-% histogram(cellEffDia,"BinEdges",SMDedges)
-% title("Particle Diameter Distribution")
-% xlabel("SMD, mm")
-% ylabel("Occurrences")
-
-% % Overlay cluster image on the background-subtracted frame
-% figure;
-% imshow(frameMonoNorm, []); hold on;
-% % Create a binary mask for the cluster image
-% clusterMask = clusterImage > 0; 
-% % Overlay red outlines for the clusters
-% visboundaries(clusterMask, 'Color', 'r', 'LineWidth', 1);
-% title('Cluster Image Overlay on Background-Subtracted Frame');
-
-%% Matlab inbuilt processing
-% Read an image
-
-%% Load image
-frame = frameMonoNorm;
-I = frame;                % Convert to grayscale
-I = im2double(I);                  % Convert to double
-
-I_gray = im2double(im2gray(frame));        % convert
-% Smooth and enhance
-I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.01); 
-I_gray = adapthisteq(I_gray);  % optional CLAHE
-
-% Compute enhancement without scaling
-I_enhanced = 1 - I_gray; % Droplets are white
-I_enhanced(I_gray < 0) = 0; % clip negatives
-
-% Clip extreme values to avoid saturation
-I_enhanced(I_enhanced > 1) = 1;
-
-% Adaptive threshold
-T = adaptthresh(I_enhanced, 0.2, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
-BW = imbinarize(I_enhanced, T);
-
-% Clean mask
-BW = bwareaopen(BW, 4);  % remove small noise
-BW = imfill(BW, 'holes');
-
-% Morphological cleanup
-BW_clean = bwareaopen(BW, 2);   % Remove small objects
-BW_clean = imfill(BW_clean, 'holes');
-
-% Label droplets
-CC = bwconncomp(BW_clean,connectivity);
-
-% Measure droplet properties
-stats = regionprops(CC, 'Area', 'Centroid', 'BoundingBox');
-
-% Compute droplet diameters
-dropletAreas = [stats.Area];
-dropletDiameters = 2*sqrt(dropletAreas/pi);  % diameter in pixels
-
-fprintf('Detected %d droplets.\n', length(stats));
-fprintf('Estimated Mean Droplet Diameter = %.2f pixels.\n', mean(dropletDiameters));
+    % Read frames
+    bg = readmraw(filePath, backgroundFrame);
+    bgMono = double(bg(:,:,monoChannel));
+    bgMonoNorm = mat2gray(bgMono);
+    bg = bgMonoNorm;
+    
+    frame = readmraw(filePath, i);
+    frameMono = double(frame(:,:,monoChannel));
+    frameMonoNorm = mat2gray(frameMono);
+    
+    % Cropping
+    y1 = max(1, round(yCenter - cropHeight/2));
+    y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
+    x1 = max(1, round(xCenter - cropWidth/2));
+    x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
+    
+    frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
+    bg = bg(y1:y2,x1:x2);
+    
+    % Subtract background
+    frameMonoNorm = frameMonoNorm ./ bg;
+    
+    %% Matlab inbuilt processing
+    frame = frameMonoNorm;
+    I = frame;                % Convert to grayscale
+    I = im2double(I);                  % Convert to double
+    
+    I_gray = im2double(im2gray(frame));        % convert
+    % Smooth and enhance
+    I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.01); 
+    I_gray = adapthisteq(I_gray);  % optional CLAHE
+    
+    % Compute enhancement without scaling
+    I_enhanced = 1 - I_gray; % Droplets are white
+    I_enhanced(I_gray < 0) = 0; % clip negatives
+    
+    % Clip extreme values to avoid saturation
+    I_enhanced(I_enhanced > 1) = 1;
+    
+    % Adaptive threshold
+    T = adaptthresh(I_enhanced, 0.2, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
+    BW = imbinarize(I_enhanced, T);
+    
+    % Clean mask
+    BW = bwareaopen(BW, 2, connectivity);  % remove small noise
+    BW = imfill(BW, 'holes');
+    
+    % Label droplets
+    CC = bwconncomp(BW,connectivity);
+    
+    % Measure droplet properties
+    stats = regionprops(CC, 'Area', 'Centroid', 'BoundingBox');
+    
+    % Compute droplet diameters
+    dropletArea = [stats.Area];
+    dropletDiameters(1:length(dropletArea),j) = 2*sqrt(dropletArea/pi);  % Diameter in pixels
+    dropletAreas(1:length(dropletArea),j) = dropletArea; % Area in pixels
+    
+    fprintf('Detected %d droplets.\n', length(stats));
+    %fprintf('Estimated Mean Droplet Diameter = %.2f pixels.\n', mean(dropletDiameters(1:length(dropletAreas),j)));
+end
 
 %% Plotting
 
@@ -262,12 +206,8 @@ sgtitle('Droplet Analysis'); % shared title
 
 figure('Name','Droplet Size Distribution','NumberTitle','off');
 
-% Define bin edges based on pixel size
-maxDiameter_mm = max(dropletDiameters)*pixelSize_mm;   % maximum droplet diameter in mm
-binEdges = 0:50; % bins of size = 1 pixel
-
-histogram(dropletDiameters, binEdges); % histogram with pixel-sized bins
-xlabel('Droplet D20 (pixels)');
+histogram(dropletAreas(:), "BinMethod", "integers", "BinLimits", [0, 50]); % histogram with pixel-sized bins limited to 50
+xlabel('Droplet Area (pixels)');
 ylabel('Number of Droplets');
 title('Droplet Size Distribution');
 grid on;
