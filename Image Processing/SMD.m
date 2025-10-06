@@ -4,9 +4,9 @@ clear all; close all; clc;
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
 folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
-datafolder = 'C:\Users\Luke''s Laptop\Downloads\';
-filePath = append(datafolder,'1_3_1_1_80bar.mraw');
-pintlePath = append(datafolder,'1_3_1_1_80bar.mraw');
+datafolder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Data\';
+filePath = append(datafolder,'1_3_1_3_81bar.mraw');
+pintlePath = append(datafolder,'1_3_1_3_81bar.mraw');
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -32,17 +32,18 @@ epsVal = 1e-6; % Background division epsilon value
 pintley = 450; % For cropping out pintle
 
 % SMD
-frameNoSMD = 500; % Frame number to analyse SMD
+frameNoSMD = 600; % Frame number to analyse SMD
+
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
 
 % Cropping inputs
 % Crop to region of interest (ROI)
-cropHeight = 200; 
-cropWidth  = 200;
-yCenter = 500;
-xCenter = 150;
+cropHeight = 400; 
+cropWidth  = 400;
+yCenter = 300;
+xCenter = 250;
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -78,8 +79,6 @@ else
 end
 disp(['Detected pintle center at (X, Y) = (', num2str(centerX), ', ', num2str(centerY), ')']);
 
-
-
 pintleWidthPixels = endIdx - startIdx;  % width of pintle in pixels
 %pixelSize_mm = pintleDiameter_mm / pintleWidthPixels;
 disp(['Pixel size: ', num2str(pixelSize_mm), ' mm/pixel']);
@@ -104,16 +103,14 @@ frame = readmraw(filePath, frameNoSMD);
 frameMono = double(frame(:,:,monoChannel));
 frameMonoNorm = mat2gray(frameMono);
 
-% % Cropping
-% y1 = max(1, round(yCenter - cropHeight/2));
-% y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
-% x1 = max(1, round(xCenter - cropWidth/2));
-% x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
-% 
-% frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
-% bg = bg(y1:y2,x1:x2);
+% Cropping
+y1 = max(1, round(yCenter - cropHeight/2));
+y2 = min(size(frameMonoNorm,1), round(yCenter + cropHeight/2));
+x1 = max(1, round(xCenter - cropWidth/2));
+x2 = min(size(frameMonoNorm,2), round(xCenter + cropWidth/2));
 
-
+frameMonoNorm = frameMonoNorm(y1:y2, x1:x2);
+bg = bg(y1:y2,x1:x2);
 
 % Subtract background
 frameMonoNorm = frameMonoNorm ./ bg;
@@ -122,28 +119,6 @@ frameMonoNorm = frameMonoNorm ./ bg;
 % Compute threshold based on percentile of pixel intensities
 threshVal = prctile(frameMonoNorm(:), percentileThresholdSMD);
 frameBW = frameMonoNorm < threshVal;
-
-% Clustering
-% Initialize label matrix
-[labelMatrix, numLabels] = bwlabel(frameBW, connectivity); % 4-connectivity
-
-% Calculate SMD
-cellCounts = zeros(numLabels, 1); % Initialize array to hold cell counts
-cellEffDia = zeros(numLabels, 1); % Initialize array to hold effective cell diameters
-for i = 1:numLabels
-    cellCounts(i) = sum(labelMatrix(:) == i); % Count number of pixels in each cluster
-    cellEffDia(i) = sqrt(4*cellCounts(i)/pi)*pixelSize_mm; % Convert to effective cell dia (eq to circle), in mm
-end
-
-% Create an image of the clusters colored by effective cell diameter
-clusterImage = zeros(size(frameBW, 1), size(frameBW, 2)); % Initialize image
-for i = 1:numLabels
-    if cellEffDia(i) < maxSMD
-        clusterImage(labelMatrix==i) = cellEffDia(i);
-    else
-        clusterImage(labelMatrix==i) = 0;
-    end
-end
 
 %% Plotting
 
@@ -206,7 +181,7 @@ end
 % visboundaries(clusterMask, 'Color', 'r', 'LineWidth', 1);
 % title('Cluster Image Overlay on Background-Subtracted Frame');
 
-%% Computer Vision
+%% Matlab inbuilt processing
 % Read an image
 
 %% Load image
@@ -234,34 +209,27 @@ BW = imbinarize(I_enhanced, T);
 BW = bwareaopen(BW, 4);  % remove small noise
 BW = imfill(BW, 'holes');
 
-% Step 2: Edge detection using Canny
-%BW = edge(I_smooth, 'Canny', [0.05 0.2]);
-
-% Step 3: Morphological cleanup
+% Morphological cleanup
 BW_clean = bwareaopen(BW, 2);   % Remove small objects
 BW_clean = imfill(BW_clean, 'holes');
 
-% Step 4: Label droplets
+% Label droplets
 CC = bwconncomp(BW_clean,connectivity);
 
-% Step 5: Measure droplet properties
+% Measure droplet properties
 stats = regionprops(CC, 'Area', 'Centroid', 'BoundingBox');
 
-% Step 7: Compute droplet diameters
+% Compute droplet diameters
 dropletAreas = [stats.Area];
 dropletDiameters = 2*sqrt(dropletAreas/pi);  % diameter in pixels
 
-% Step 8: Compute Sauter Mean Diameter (D32)
-SMDs = sum(dropletDiameters.^3) / sum(dropletDiameters.^2);
-
 fprintf('Detected %d droplets.\n', length(stats));
-fprintf('Mean droplet area = %.2f mm2.\n', mean(dropletAreas)*pixelSize_mm^2);
-fprintf('Estimated Sauter Mean Diameter (SMD) = %.2f mm.\n', SMDs*pixelSize_mm);
+fprintf('Estimated Mean Droplet Diameter = %.2f pixels.\n', mean(dropletDiameters));
 
 %% Plotting
 
 figure('Name','Droplet Analysis','NumberTitle','off');
-t = tiledlayout(3,2,'Padding','compact','TileSpacing','compact'); % 4 images, compact spacing
+t = tiledlayout(2,2,'Padding','compact','TileSpacing','compact'); % 4 images, compact spacing
 
 % Original (cropped) frame
 nexttile;
@@ -272,11 +240,6 @@ title('Original Cropped Frame');
 nexttile;
 imshow(I_enhanced); 
 title('Enhanced Image');
-
-% Threshold
-nexttile;
-imshow(T);
-title("Threshold")
 
 % Binary Mask
 nexttile;
@@ -301,10 +264,10 @@ figure('Name','Droplet Size Distribution','NumberTitle','off');
 
 % Define bin edges based on pixel size
 maxDiameter_mm = max(dropletDiameters)*pixelSize_mm;   % maximum droplet diameter in mm
-binEdges = 0:pixelSize_mm:(maxDiameter_mm + pixelSize_mm); % bins of size = 1 pixel
+binEdges = 0:50; % bins of size = 1 pixel
 
-histogram(dropletDiameters*pixelSize_mm, binEdges); % histogram with pixel-sized bins
-xlabel('Droplet Diameter (mm)');
+histogram(dropletDiameters, binEdges); % histogram with pixel-sized bins
+xlabel('Droplet D20 (pixels)');
 ylabel('Number of Droplets');
 title('Droplet Size Distribution');
 grid on;
