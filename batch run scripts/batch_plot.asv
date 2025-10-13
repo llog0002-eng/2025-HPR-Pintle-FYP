@@ -1,0 +1,307 @@
+clc, clear all, close all
+
+%% importing shiz
+washer1 = table2struct(readtable("washer1\washer1_results_summary.csv"));
+washer2 = table2struct(readtable("washer2\washer2_results_summary.csv"));
+washer3 = table2struct(readtable("washer3\washer3_results_summary.csv"));
+washer4 = table2struct(readtable("washer4\washer4_results_summary.csv"));
+% varNames = { ...
+%     'File','mean_Q_after_max','average_after_max_p','total_Q','max_pressure', ...
+%     'Cd_eff_i','Cd_eff_o','Cd_eff','CD', ...
+%     'max_Re','avg_Re','max_Web','avg_Web','max_Web_rel','avg_web_rel', ...
+%     'max_Web_i','avg_Web_i','max_Web_o','avg_Web_o', ...
+%     'max_Q_outer','avg_Q_outer','max_Q_inner','avg_Q_inner', ...
+%     'max_v_outer','avg_v_outer','max_v_inner','avg_v_inner', ...
+%     'max_v_rel','avg_v_rel','max_v','avg_v'};
+
+
+
+%% plotting flowrates vs pressure
+figure;
+plot([washer1.average_after_max_p], [washer1.mean_Q_after_max], '*'); hold on
+plot([washer2.average_after_max_p], [washer2.mean_Q_after_max], '*');
+plot([washer3.average_after_max_p], [washer3.mean_Q_after_max], '*');
+plot([washer4.average_after_max_p], [washer4.mean_Q_after_max], '*');
+xlabel('Pressure (bar)');
+ylabel('flowrate (L/s)');
+title('Washer Comparison');
+legend('Washer 1', 'Washer 2', 'Washer 3', 'Washer 4','Location','northwest');
+grid on;
+
+%% plotting cd vs xx
+% cd vs pressure
+figure;
+plot([washer1.average_after_max_p], [washer1.CD], '*'); hold on
+plot([washer2.average_after_max_p], [washer2.CD], '*');
+plot([washer3.average_after_max_p], [washer3.CD], '*');
+plot([washer4.average_after_max_p], [washer4.CD], '*');
+xlabel('Pressure (bar)');
+ylabel('Discharge Coefficient Cd');
+title('Washer Comparison');
+legend('Washer 1', 'Washer 2', 'Washer 3', 'Washer 4','Location','northwest');
+grid on;
+%cd vs flowraate
+figure;
+plot([washer1.mean_Q_after_max], [washer1.CD], '*'); hold on
+plot([washer2.mean_Q_after_max], [washer2.CD], '*');
+plot([washer3.mean_Q_after_max], [washer3.CD], '*');
+plot([washer4.mean_Q_after_max], [washer4.CD], '*');
+xlabel('Flow Rate L/s');
+ylabel('Discharge Coefficient Cd');
+title('Washer Comparison');
+legend('Washer 1', 'Washer 2', 'Washer 3', 'Washer 4','Location','northwest');
+grid on;
+
+%% plotting cd vs webber and re (total)
+%webber
+figure;
+plot([washer1.avg_Web], [washer1.CD], '*'); hold on
+plot([washer2.avg_Web], [washer2.CD], '*');
+plot([washer3.avg_Web], [washer3.CD], '*');
+plot([washer4.avg_Web], [washer4.CD], '*');
+xlabel('webber number');
+ylabel('Discharge Coefficient Cd');
+title('Washer Comparison');
+legend('Washer 1', 'Washer 2', 'Washer 3', 'Washer 4','Location','northeast');
+grid on;
+%reynolds
+figure;
+plot([washer1.avg_Re], [washer1.CD], '*'); hold on
+plot([washer2.avg_Re], [washer2.CD], '*');
+plot([washer3.avg_Re], [washer3.CD], '*');
+plot([washer4.avg_Re], [washer4.CD], '*');
+xlabel('Reynolds number');
+ylabel('Discharge Coefficient Cd');
+title('Washer Comparison');
+legend('Washer 1', 'Washer 2', 'Washer 3', 'Washer 4','Location','northeast');
+grid on;
+
+%% plotting webber numbers vs flow rate
+figure;
+
+% Define markers and colors
+markers = {'o','s','^','d'};
+colors = lines(4);
+
+% Store handles for legend
+hLegendPlots = gobjects(4,1);
+
+% Subplot 1: Inner Weber
+subplot(2,2,1); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    hLegendPlots(i) = plot([washer.mean_Q_after_max], [washer.avg_Web_i], ...
+        markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Flow Rate (L/s)'); ylabel('Weber (Inner)'); title('Inner Weber'); grid on;
+
+% Subplot 2: Outer Weber
+subplot(2,2,2); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.mean_Q_after_max], [washer.avg_Web_o], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Flow Rate (L/s)'); ylabel('Weber (Outer)'); title('Outer Weber'); grid on;
+
+% Subplot 3: relitive Weber
+subplot(2,2,3); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.mean_Q_after_max], [washer.avg_web_rel], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Flow Rate (L/s)'); ylabel('Weber (Combined relitive)'); title('Combined relitive Weber'); grid on;
+
+% Subplot 4: single flow combined webber
+subplot(2,2,4); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.mean_Q_after_max], [washer.avg_Web], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Flow Rate (L/s)'); ylabel('Weber (Combined)'); title('combined webber'); grid on;
+
+% Create a single legend below all subplots
+legend(hLegendPlots, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', 'Position',[0.35 0.01 0.3 0.05]);
+
+sgtitle('Flow vs Weber and Reynolds for All Washers');
+
+
+%% plotting the pressure vs webber numbers
+figure;
+
+% Define markers and colors
+markers = {'o','s','^','d'};
+colors = lines(4);
+
+% Store handles for legend
+hLegendPlots = gobjects(4,1);
+
+% Subplot 1: Inner Weber
+subplot(2,2,1); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    hLegendPlots(i) = plot([washer.average_after_max_p], [washer.avg_Web_i], ...
+        markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)'); ylabel('Weber (Inner)'); title('Inner Weber'); grid on;
+
+% Subplot 2: Outer Weber
+subplot(2,2,2); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_Web_o], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)'); ylabel('Weber (Outer)'); title('Outer Weber'); grid on;
+
+% Subplot 3: Combined Weber
+subplot(2,2,3); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_web_rel], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)'); ylabel('Weber (Combined relitive)'); title('Combined relitive Weber'); grid on;
+
+% Subplot 4: Reynolds
+subplot(2,2,4); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_Web], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)'); ylabel('combined webber'); title('Webber Combined'); grid on;
+
+% Create a single legend below all subplots
+legend(hLegendPlots, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', 'Position',[0.35 0.01 0.3 0.05]);
+
+sgtitle('Pressure vs Weber for All Washers');
+
+%% plotting velocities
+figure;
+
+% Define markers and colors
+markers = {'o','s','^','d'};
+colors = lines(4);
+
+% Store handles for legend
+hLegendPlots = gobjects(4,1);
+
+% --- Subplot 1: Average Outer Velocity ---
+subplot(2,2,1); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    hLegendPlots(i) = plot([washer.average_after_max_p], [washer.avg_v_outer], ...
+        markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)');
+ylabel('v_{outer} (m/s)');
+title('Average Outer Velocity');
+grid on;
+
+% --- Subplot 2: Average Inner Velocity ---
+subplot(2,2,2); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_v_inner], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)');
+ylabel('v_{inner} (m/s)');
+title('Average Inner Velocity');
+grid on;
+
+% --- Subplot 3: Average Relative Velocity ---
+subplot(2,2,3); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_v_rel], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)');
+ylabel('v_{rel} (m/s)');
+title('Average Relative Velocity');
+grid on;
+
+% --- Subplot 4: Average Velocity ---
+subplot(2,2,4); hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.average_after_max_p], [washer.avg_v], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Average Pressure After Max (bar)');
+ylabel('v_{avg} (m/s)');
+title('Average Velocity');
+grid on;
+
+% --- Create a single legend below all subplots ---
+legend(hLegendPlots, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', 'Position',[0.35 0.01 0.3 0.05]);
+
+
+%% philips graph
+figure();
+yyaxis left
+h(1) = plot([washer1.CD], [washer1.avg_Web], '*'); hold on;
+h(2) = plot([washer2.CD], [washer2.avg_Web], 'o');
+h(3) = plot([washer3.CD], [washer3.avg_Web], 'x');
+h(4) = plot([washer4.CD], [washer4.avg_Web], 'v');
+xlabel('Cd');
+ylabel('Webber Number');
+
+% Right axis (Reynolds)
+yyaxis right
+plot([washer1.CD], [washer1.avg_Re], '*'); hold on;
+plot([washer2.CD], [washer2.avg_Re], 'o');
+plot([washer3.CD], [washer3.avg_Re], 'x');
+plot([washer4.CD], [washer4.avg_Re], 'v');
+ylabel('Reynolds Number');
+
+grid on
+markers = {'*','o','x','v'};
+h = gobjects(4,1);
+for i = 1:4
+    h(i) = plot(nan, nan, markers{i}, 'MarkerEdgeColor','k'); 
+end
+
+% Add legend using dummy plots
+legend(h, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', ...
+       'Position',[0.3 0.01 0.4 0.05]); % [x y width height] in normalized units
+
+%%
+% Create a new figure for TMR average vs Weber number
+figure;
+
+% Define markers and colors
+markers = {'o','s','^','d'};
+colors = lines(4);
+
+% Store handles for legend
+hLegendPlots = gobjects(4,1);
+
+% Subplot: TMR Average vs Weber Number
+hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    hLegendPlots(i) = plot([washer.avg_TMR], [washer.avg_Web], ...
+        markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('TMR Average'); ylabel('Weber Number'); title('TMR Average vs Weber Number'); grid on;
+
+% Create a single legend for the plot
+legend(hLegendPlots, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', 'Position',[0.35 0.01 0.3 0.05]);
+
+% Create a new figure for TMR vs CD
+figure;
+
+% Subplot: TMR vs Cd
+hold on;
+for i = 1:4
+    washer = eval(sprintf('washer%d', i));
+    plot([washer.CD], [washer.avg_TMR], markers{i}, 'Color', colors(i,:), 'LineWidth', 1.2);
+end
+xlabel('Cd'); ylabel('TMR Average'); title('TMR Average vs Cd'); grid on;
+
+% Create a single legend for the plot
+legend(hLegendPlots, {'Washer 1','Washer 2','Washer 3','Washer 4'}, ...
+       'Orientation','horizontal', 'Position',[0.35 0.01 0.3 0.05]);
+
+

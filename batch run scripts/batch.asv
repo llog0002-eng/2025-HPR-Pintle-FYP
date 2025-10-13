@@ -1,0 +1,200 @@
+clear; close all; clc;
+
+%% === User Settings ===
+input_folder = uigetdir(pwd, 'Select folder containing .lvm files');
+output_csv = fullfile(input_folder, 'washer4_results_summary.csv');
+washer = 4;
+
+%% === Get all .lvm files ===
+files = dir(fullfile(input_folder, '*.lvm'));
+if isempty(files)
+    error('No .lvm files found in the selected folder.');
+end
+
+%% === Preallocate results table ===
+varNames = { ...
+    'File','mean_Q_after_max','average_after_max_p','total_Q','max_pressure', ...
+    'Cd_eff_i','Cd_eff_o','Cd_eff','CD', ...
+    'max_Re','avg_Re','max_Web','avg_Web','max_Web_rel','avg_web_rel', ...
+    'max_Web_i','avg_Web_i','max_Web_o','avg_Web_o', ...
+    'max_Q_outer','avg_Q_outer','max_Q_inner','avg_Q_inner', ...
+    'max_v_outer','avg_v_outer','max_v_inner','avg_v_inner', ...
+    'max_v_rel','avg_v_rel','max_v','avg_v', ...
+    'max_TMR','avg_TMR'};
+varTypes = ["string", repmat("double",1,length(varNames)-1)];
+results = table('Size',[0,length(varNames)], 'VariableTypes',varTypes, 'VariableNames',varNames);
+
+%% === Loop through each file ===
+for f = 1:length(files)
+    try
+        file_path = fullfile(files(f).folder, files(f).name);
+        fprintf('\nProcessing file: %s\n', files(f).name);
+
+        %% === IMPORT AND SETUP ===
+        A = lvm_import(file_path, 2);
+        raw_temp = A.Segment1.data(:,1);
+        raw_pressure_voltage = A.Segment1.data(:,3);
+        raw_flowrate = A.Segment1.data(:,2);
+
+        % Constants
+        p_target = 12.5; % target pressure (bar)
+        slope = 51.553;
+        interpt = -51.881;
+        
+        Fs = 10000;
+        n = 8000;
+        T = 1/Fs;
+        t = (0:n-1)*T;
+        rho = 1000;
+
+        %% === FILTER PRESSURE ===
+        raw_pressure = slope*raw_pressure_voltage + interpt;
+        filtered_pressure = movmean(raw_pressure,1000);
+
+        %% === FLOW METER PROCESSING ===
+        threshold = (max(raw_flowrate) + min(raw_flowrate)) / 2;
+        rising_edges  = find(raw_flowrate(1:end-1) < threshold & raw_flowrate(2:end) >= threshold);
+        falling_edges = find(raw_flowrate(1:end-1) >= threshold & raw_flowrate(2:end) < threshold);
+
+        if falling_edges(1) < rising_edges(1)
+            falling_edges(1) = [];
+        end
+        if rising_edges(end) > falling_edges(end)
+            rising_edges(end) = [];
+        end
+
+        N_pairs = min(length(rising_edges), length(falling_edges));
+        t_rise = rising_edges(1:N_pairs) / Fs;
+        t_fall = falling_edges(1:N_pairs) / Fs;
+
+        k = 1/864.49; % L per pulse
+        N = 5;
+        t_start = t_rise(1:end-N);
+        t_end   = t_rise(1+N:end);
+        t_block = 0.5*(t_start + t_end);
+        Q_block = k * N ./ (t_end - t_start);
+
+        t_inst = [0; t_block(:)];
+        Q_inst = [0; Q_block(:)];
+        t_cont = linspace(t_inst(1), t_inst(end), 1000);
+        Q_cont = interp1(t_inst, Q_inst, t_cont, 'linear', 'extrap');
+
+        Fc_flow = 20;
+        order_flow = 4;
+        Fs_cont = 1/mean(diff(t_cont));
+        Wn_flow = Fc_flow/(Fs_cont/2);
+        [b_flow,a_flow] = butter(order_flow,Wn_flow,'low');
+        Q_smooth = filtfilt(b_flow,a_flow,Q_cont);
+
+        Q_cont(Q_cont < 0) = 0;
+        Q_smooth(Q_smooth < 0) = 0;
+
+        %% === MASS FLOW RATE ===
+        m_dot_f = Q_smooth * rho / 1000;
+
+        %% === PRESSURE STATS ===
+        p_supply = 80;
+        p_average = mean(filtered_pressure(filtered_pressure >= 1));
+        p_drop = p_supply - p_average;
+        [~,idx_max] = max(filtered_pressure);
+        average_after_max_p = mean(filtered_pressure(idx_max:end));
+        [~,idx_max_q] = max(Q_smooth);
+
+        %% === BASIC CALCULATIONS ===
+        Q_total = trapz(t_cont, Q_smooth);
+        max_pressure = max(filtered_pressure);
+        mean_flow_after_max = mean(Q_smooth(idx_max_q:end));
+
+        %% === DISCHARGE COEFFICIENTS & FLUID PROPERTIES ===
+        p_atm = 1e5;
+        delta_p = filtered_pressure*1e5 - p_atm;
+        h_p = [2.15, 1.69,1.02,0.79]*1e-3;
+        h = h_p(washer);
+        a_o = 18.6e-6;
+        sleeve_id = 14e-3;
+        a_i = sleeve_id*pi*h;
+        A_nozzle = a_i+a_o;
+
+        Cd_i = 0.5; Cd_o = 0.95; Cd_ip = 0.45; Cd_op = 0.95;
+        A_ip = 49.09e-6; A_op = 14.14e-6;
+        K_i = Cd_i*a_i; K_ip = Cd_ip*A_ip; K_o = Cd_o*a_o; K_op = Cd_op*A_op;
+        K_i_eq = (1/K_i^2+1/K_ip^2)^(-1/2);
+        K_o_eq = (1/K_o^2+1/K_op^2)^(-1/2);
+        K_eq = K_i_eq + K_o_eq;
+        Ps_f = p_average; rho_f = rho;
+
+        mox = K_i_eq * sqrt(2*rho_f*Ps_f*1e5);
+        mox_r = mox*cosd(40)
+        mox_a = mox*sind(40);
+        mf = K_o_eq * sqrt(2*rho_f*Ps_f*1e5);
+
+        Cd_eff_i = mox/(a_i*sqrt(2*rho_f*Ps_f*1e5));
+        Cd_eff_o = mf/(a_o*sqrt(2*rho_f*Ps_f*1e5));
+        Cd_eff = (mox+mf)/((a_o+a_i)*sqrt(2*rho_f*Ps_f*1e5));
+
+        Q_theoretical = A_nozzle .* sqrt(2 .* delta_p .* rho);
+        Q_theoretical = Q_theoretical(1:(length(Q_theoretical)/1000):end);
+        CD_instantaneous = m_dot_f' ./ Q_theoretical;
+        [cd_max, cd_max_i] = max(abs(CD_instantaneous));
+        CD = mean(CD_instantaneous(cd_max_i+100:end));
+
+        %% === WEBER & REYNOLDS NUMBERS ===
+        Q_outer = Q_cont.*mf/(mox+mf);
+        Q_inner = Q_cont.*mox/(mox+mf);
+        Q_inner_r = Q_inner*cosd(40);
+        Q_inner_a = Q_inner*sind(40);
+        v= Q_smooth.*10^-3./A_nozzle;
+        v_outer = (Q_outer*1e-3)/a_o;
+        v_inner = (Q_inner*1e-3)/a_i;
+        v_ia = v_inner*sind(40)
+        v_ir = v_inner*cosd(40);
+        v_rel = sqrt((v_ia-v_outer).^2+v_ir.^2);
+        sigma = 72.8e-3;
+        mu = 8.9e-4;
+        L = h;
+        Web = (rho.*v.^2.*L)./sigma;
+        Web_rel = (rho.*v_rel.^2.*L)./sigma;
+        Web_i = (rho.*v_inner.^2.*L)./sigma;
+        Web_o = (rho.*v_outer.^2.*L)./sigma;
+        Re = (rho.*v_rel.*L)./mu;
+
+        
+        %% === THROUGHPUT MASS RATIO (TMR) ===
+       
+        TMR = ((Q_inner_r) .* v_ir) ./ ((Q_outer.* v_outer)+(Q_inner_a.*v_ia));
+        [max_TMR, ind_TMR] = max(TMR); 
+        avg_TMR = mean(TMR(ind_TMR:end));
+
+        [max_Q_outer, ind_Q_outer] = max(Q_outer); avg_Q_outer = mean(Q_outer(ind_Q_outer:end));
+        [max_Q_inner, ind_Q_inner] = max(Q_inner); avg_Q_inner = mean(Q_inner(ind_Q_inner:end));
+        [max_v_outer, ind_v_outer] = max(v_outer); avg_v_outer = mean(v_outer(ind_v_outer:end));
+        [max_v_inner, ind_v_inner] = max(v_inner); avg_v_inner = mean(v_inner(ind_v_inner:end));
+        [max_v_rel, ind_v_rel] = max(v_rel); avg_v_rel = mean(v_rel(ind_v_rel:end));
+        [max_v, ind_v] = max(v); avg_v = mean(v(ind_v:end));
+        [max_re,ind_re] = max(Re); avg_re = mean(Re(ind_re:end));
+        [max_web,ind_web] = max(Web); avg_web = mean(Web(ind_web:end));
+        [max_Web_rel, ind_Web_rel] = max(Web_rel); avg_web_rel = mean(Web_rel(ind_Web_rel:end));
+        [max_Web_i, ind_Web_i] = max(Web_i); avg_Web_i = mean(Web_i(ind_Web_i:end));
+        [max_Web_o, ind_Web_o] = max(Web_o); avg_Web_o = mean(Web_o(ind_Web_o:end));
+
+        %% === STORE RESULTS ===
+        newRow = { ...
+            string(files(f).name), ...
+            mean_flow_after_max, average_after_max_p, Q_total, max_pressure, ...
+            Cd_eff_i, Cd_eff_o, Cd_eff, CD, ...
+            max_re, avg_re, max_web, avg_web, max_Web_rel, avg_web_rel, ...
+            max_Web_i, avg_Web_i, max_Web_o, avg_Web_o, ...
+            max_Q_outer, avg_Q_outer, max_Q_inner, avg_Q_inner, ...
+            max_v_outer, avg_v_outer, max_v_inner, avg_v_inner, ...
+            max_v_rel, avg_v_rel, max_v, avg_v, ...
+            max_TMR, avg_TMR}; % Added TMR variables
+        results = [results; newRow];
+
+    catch ME
+        warning('Error processing %s: %s', files(f).name, ME.message);
+    end
+end
+
+%% === EXPORT RESULTS ===
+writetable(results, output_csv);
+fprintf('\n✅ Results saved to: %s\n', output_csv);
