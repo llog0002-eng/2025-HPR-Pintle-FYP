@@ -163,7 +163,7 @@ Cd_o = 0.7; % Outer orifice Cd
 Cd_ip = 0.7; % Inner passthrough Cd
 Cd_op = 0.7; % Outer passthrough Cd
 
-theta_pt = 40; % pintle tip angle (deg)
+theta_pt = 40; % pintle tip angle (deg, from horizontal)
 Dpr = 3; % pintle rod diameter (mm) ## Change this to be a dependent variable later
 Dcg = 4.5; % center gap diameter (mm) #s# Change this to be a dependent variable later
 r_post = Dpt/2; % post diameter radius (mm)
@@ -216,12 +216,8 @@ Re_i = rho_ox*U_i*Dh_i/mu_ox;
 Re_o = rho_f*U_o*Dh_o/mu_f;
 
 % Total momentum ratio
-U_ia = U_i*sind(theta_pt); % Inner flow axial flow velocity
-U_ir = U_i*cosd(theta_pt); % Inner flow radial flow velocity
-mox_a = mox*sind(theta_pt); % Inner flow axial mass flow
-mox_r = mox*cosd(theta_pt); % Inner flow radial mass flow
-TMR = (mox_r*U_i)/(mf*U_o);
-TMRold = (mox_r*U_ir)/(mf*U_o+mox_a*U_ia);
+% Thanks chat for the derivation https://chatgpt.com/share/68ecc095-0eac-8013-bbe3-d4a45ccc6e4e
+TMR = (mox*U_i)/(mf*U_o);
 
 % Momentum flux ratio
 J = (rho_f*U_o^2)/(rho_ox*U_i^2);
@@ -233,21 +229,7 @@ We_o = rho_f*U_o^2*Gap_o*1e-3/sigma_f;
 % Want We_i or We_o ~ 3000 for "fully developed fan spray"
 % "The spray and atomization process and its effects on combustion performance of pintle injector,” Ph.D. thesis
 
-% Weber number ### OXIDISER MUST BE GASEOUS AND FUEL LIQUID
-% Uses relative velocity
-U_rel = sqrt((U_ia-U_o)^2+U_ir^2);
-We = rho_ox_g*U_rel^2*Gap_i*1e-3/sigma_f;
-
 %% Spray Angle Prediction
 
 % Half angle
-alpha = 90 - theta_pt;
-theta_spray_half = atand(TMRold);
-theta_spray_half_old = acosd(1/(1+TMRold));
-
-%% Atomisation Prediction
-
-zeta = (90-theta_pt)/(90);
-q = 3.455-0.225*zeta;
-SMD_Son = 1e3*Gap_i*zeta^(-1)*exp(4.0-q*(We)^0.1); % SMD in micron, Son https://doi.org/10.2514/6.2016-1453
-SMD_Lee = -111.25*log(J^(-0.93)*We^0.05)+294.93; % SMD in micron, no consideration of pintle angle
+theta_spray_half = atand(TMR * cosd(theta_pt)/(TMR * sind(theta_pt) + 1)); % Degrees

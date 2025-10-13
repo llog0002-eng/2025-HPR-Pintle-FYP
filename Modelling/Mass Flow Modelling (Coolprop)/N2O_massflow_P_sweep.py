@@ -8,7 +8,7 @@ P2 = 1e5 # Pa
 P1 = 50e5 # Pa
 T1 = 290 # K
 Cd = 0.7
-A = 32e-6 # m2
+A = 32/4e-6 # m2
 Pv = CP.PropsSI("P","T",T1,"Q",1,"N2O") # Pa
 
 ### HEM
