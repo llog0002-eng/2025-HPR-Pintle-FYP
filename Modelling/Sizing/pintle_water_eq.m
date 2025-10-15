@@ -16,7 +16,7 @@ go = 9.81; % gravitational acceleration (m/s^2)
 % Design points
 T = 3000; % thrust (N)
 Pc = 25; % desired chamber pressure (bar)
-Ps_f = 12.65; % fuel supply pressure (bar)
+Ps_f = 15; % fuel supply pressure (bar)
 Ps_ox = Ps_f; % oxidiser supply pressure (bar)
 Pa = 1.01325; % sea level pressure (bar) 
 OFtarg = 2.5; % desired oxidiser to fuel ratio
@@ -158,10 +158,10 @@ t_sleeve = 5.5; % thickness of sleeve (mm)
 id_sleeve = Dpt - 2*t_sleeve; % sleeve ID (mm)
 
 % Discharge coefficients for inner and outer flows, from experimental data https://www.researchgate.net/publication/301440576_Experiments_with_Pintle_Injector_Design_and_Development
-Cd_i = 0.7; % Inner orifice Cd
-Cd_o = 0.7; % Outer orifice Cd
-Cd_ip = 0.7; % Inner passthrough Cd
-Cd_op = 0.7; % Outer passthrough Cd
+Cd_i = 0.516; % Inner orifice Cd
+Cd_o = 0.56; % Outer orifice Cd
+Cd_ip = 0.376; % Inner passthrough Cd
+Cd_op = 1; % Outer passthrough Cd
 
 theta_pt = 40; % pintle tip angle (deg, from horizontal)
 Dpr = 3; % pintle rod diameter (mm) ## Change this to be a dependent variable later
@@ -178,7 +178,7 @@ pass_o_n = 8; % Numberof inner passthrough holes
 A_op = pass_o_n * pass_o_d^2/4 * pi; % Area of inner passthrough holes (mm2)
 
 A_o = 18.6; % Outer orifice area (mm2)
-A_i = 65.7*throttle; % Inner orifice area (mm2)
+A_i = pi*id_sleeve*0.79;%65.7*throttle; % Inner orifice area (mm2)
 
 % Flow conductances
 K_i = Cd_i * A_i / 1e3^2;

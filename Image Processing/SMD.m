@@ -3,10 +3,10 @@ clear all; close all; clc;
 %% --- User settings ---
 
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
-folder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Testing data\Sample\';
-datafolder = 'C:\Users\Luke''s Laptop\OneDrive - Monash University\Uni\HPR\FYP\Data\';
-filePath = append(datafolder,'1_3_1_3_81bar.mraw');
-pintlePath = append(datafolder,'1_3_1_3_81bar.mraw');
+folder = 'A:\Uni\FYP\Droplet test data\';
+datafolder = 'A:\Uni\FYP\Droplet test data\';
+filePath = append(datafolder,'4_1_4_1_85bar.mraw');
+pintlePath = append(datafolder,'4_1_4_1_85bar.mraw');
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -32,9 +32,9 @@ epsVal = 1e-6; % Background division epsilon value
 pintley = 450; % For cropping out pintle
 
 % SMD
-frameNoSMDstart = 600; % Frame number to start analysing droplets
+frameNoSMDstart = 650; % Frame number to start analysing droplets
 frameNoSMDstep = 10; % Frames to step between droplet analysis
-frameNoSMDend = 700; % Frame number to stop analysing droplets
+frameNoSMDend = 650; % Frame number to stop analysing droplets
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
@@ -137,7 +137,7 @@ for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
     
     I_gray = im2double(im2gray(frame));        % convert
     % Smooth and enhance
-    I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.01); 
+    I_gray = imguidedfilter(I_gray, 'DegreeOfSmoothing', 0.005); 
     I_gray = adapthisteq(I_gray);  % optional CLAHE
     
     % Compute enhancement without scaling
@@ -148,7 +148,7 @@ for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
     I_enhanced(I_enhanced > 1) = 1;
     
     % Adaptive threshold
-    T = adaptthresh(I_enhanced, 0.2, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
+    T = adaptthresh(I_enhanced, 0.5, 'ForegroundPolarity','bright', 'NeighborhoodSize', 11);
     BW = imbinarize(I_enhanced, T);
     
     % Clean mask
@@ -211,3 +211,19 @@ xlabel('Droplet Area (pixels)');
 ylabel('Number of Droplets');
 title('Droplet Size Distribution');
 grid on;
+
+% Just droplet centroids on original image
+
+figure;
+imshow(frame); 
+hold on;
+for k = 1:length(stats)
+    plot(stats(k).Centroid(1), stats(k).Centroid(2), 'r*', 'MarkerSize', 5);
+end
+hold off;
+title('Droplet Centroids on Original Image');
+
+%% Text output
+
+D20 = mean(sqrt(4*dropletAreas(:)/pi), 'omitnan'); % surface mean diameter, D20
+fprintf("D20: %.2f pixels\n",D20)
