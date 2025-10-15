@@ -10,8 +10,8 @@ monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
 
 folder = 'A:\Uni\FYP\Droplet test data\';
 datafolder = 'A:\Uni\FYP\Droplet test data\';
-filePath = append(datafolder,'4_1_3_1_88bar.mraw');
-pintlePath = append(datafolder,'4_1_3_1_88bar.mraw');
+filePath = append(datafolder,'4_1_4_1.mraw');
+pintlePath = append(datafolder,'4_1_4_1.mraw');
 outfile = "SMDout.csv";
 
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
@@ -53,7 +53,7 @@ connectivity = 4;
 cropHeight = 400; 
 cropWidth  = 400;
 yCenter = 400;
-xCenter = 500;
+xCenter = 700;
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -157,7 +157,7 @@ for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
     I_enhanced(I_enhanced > 1) = 1;
     
     % Adaptive threshold
-    T = adaptthresh(I_enhanced, 0.4, 'ForegroundPolarity','bright', 'NeighborhoodSize', 11);
+    T = adaptthresh(I_enhanced, 0.1, 'ForegroundPolarity','bright', 'NeighborhoodSize', 35);
     BW = imbinarize(I_enhanced, T);
     
     % Clean mask
@@ -246,11 +246,16 @@ end
 hold off;
 title('Droplet Centroids on Original Image');
 
+% Whole original image
+
+figure;
+imshow(mat2gray(frameMono))
+
 %% Text output
 
 fprintf("D20: %.2f mm\n",D20)
 
 %% File Output
 
-hpt = 1.02; % Height of pintle, mm, to write to first column
-writematrix([hpt D20s'],outfile,'Delimiter',',','WriteMode','append');
+% hpt = 0.79; % Height of pintle, mm, to write to first column
+% writematrix([hpt D20s'],outfile,'Delimiter',',','WriteMode','append');
