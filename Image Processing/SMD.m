@@ -2,19 +2,28 @@ clear all; close all; clc;
 
 %% --- User settings ---
 
+% Set plots to light mode
+s = settings;
+s.matlab.appearance.figure.GraphicsTheme.TemporaryValue = "light";
+
 monoChannel = 1;  % 1=Red, 2=Green, 3=Blue
+
 folder = 'A:\Uni\FYP\Droplet test data\';
 datafolder = 'A:\Uni\FYP\Droplet test data\';
-filePath = append(datafolder,'4_1_4_1_85bar.mraw');
-pintlePath = append(datafolder,'4_1_4_1_85bar.mraw');
+filePath = append(datafolder,'4_1_3_1_88bar.mraw');
+pintlePath = append(datafolder,'4_1_3_1_88bar.mraw');
+outfile = "SMDout.csv";
+
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
+
+
 frameDelay = 0.005; % delay between frames in seconds (for plotting)
 visualFrames = 50; % number of frames to display in MATLAB plot (from start frame of flow)
 chunkSize = 100; % allocation for efficiency 
 percentileThresholdAng = 45; % threshold for detecting spray, spray angle
-pixelSize_mm = 0.05;
+pixelSize_mm = 0.0996;
 
 sigmaSmooth = 1;
 startFrame = 4;
@@ -34,7 +43,7 @@ pintley = 450; % For cropping out pintle
 % SMD
 frameNoSMDstart = 650; % Frame number to start analysing droplets
 frameNoSMDstep = 10; % Frames to step between droplet analysis
-frameNoSMDend = 650; % Frame number to stop analysing droplets
+frameNoSMDend = 750; % Frame number to stop analysing droplets
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
@@ -43,8 +52,8 @@ connectivity = 4;
 % Crop to region of interest (ROI)
 cropHeight = 400; 
 cropWidth  = 400;
-yCenter = 300;
-xCenter = 550;
+yCenter = 400;
+xCenter = 500;
 
 % Camera settings (only used for determine info in command window not used
 % in script)
@@ -148,7 +157,7 @@ for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
     I_enhanced(I_enhanced > 1) = 1;
     
     % Adaptive threshold
-    T = adaptthresh(I_enhanced, 0.5, 'ForegroundPolarity','bright', 'NeighborhoodSize', 11);
+    T = adaptthresh(I_enhanced, 0.4, 'ForegroundPolarity','bright', 'NeighborhoodSize', 11);
     BW = imbinarize(I_enhanced, T);
     
     % Clean mask
@@ -169,6 +178,9 @@ for i=frameNoSMDstart:frameNoSMDstep:frameNoSMDend
     fprintf('Detected %d droplets.\n', length(stats));
     %fprintf('Estimated Mean Droplet Diameter = %.2f pixels.\n', mean(dropletDiameters(1:length(dropletAreas),j)));
 end
+
+D20s = pixelSize_mm*sqrt(4*dropletAreas(:)/pi); % surface diameters, D20
+D20 = mean(D20s,"omitnan");
 
 %% Plotting
 
@@ -204,10 +216,21 @@ sgtitle('Droplet Analysis'); % shared title
 
 % Histogram
 
+% % Area in pixels
+% figure('Name','Droplet Size Distribution','NumberTitle','off');
+% 
+% histogram(dropletAreas(:), "BinMethod", "integers", "BinLimits", [0, 50]); % histogram with pixel-sized bins limited to 50
+% xlabel('Droplet Area (pixels)');
+% ylabel('Number of Droplets');
+% title('Droplet Size Distribution');
+% grid on;
+
+% Diameter in mm
 figure('Name','Droplet Size Distribution','NumberTitle','off');
 
-histogram(dropletAreas(:), "BinMethod", "integers", "BinLimits", [0, 50]); % histogram with pixel-sized bins limited to 50
-xlabel('Droplet Area (pixels)');
+edges = linspace(0,2,25);
+histogram(D20s, edges); % histogram with pixel-sized bins limited to 50
+xlabel('Droplet Surface Diameter (mm)');
 ylabel('Number of Droplets');
 title('Droplet Size Distribution');
 grid on;
@@ -225,5 +248,9 @@ title('Droplet Centroids on Original Image');
 
 %% Text output
 
-D20 = mean(sqrt(4*dropletAreas(:)/pi), 'omitnan'); % surface mean diameter, D20
-fprintf("D20: %.2f pixels\n",D20)
+fprintf("D20: %.2f mm\n",D20)
+
+%% File Output
+
+hpt = 1.02; % Height of pintle, mm, to write to first column
+writematrix([hpt D20s'],outfile,'Delimiter',',','WriteMode','append');

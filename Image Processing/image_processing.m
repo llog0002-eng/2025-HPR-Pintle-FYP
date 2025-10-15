@@ -5,9 +5,9 @@ processGif = false;
 processSprayAngle = true;
 allFrames = false;
 monoChannel = 2;  % 1=Red, 2=Green, 3=Blue
-folder = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\';
-filePath = append(folder,'1_1_4_2_70bar.mraw');
-backgroundPath = '\\ad.monash.edu\home\User090\ppin0001\Desktop\Pintle Data\19_9_25\1_1_3_1_60bar.mraw'; % DO NOT CHANGE
+folder = 'A:\Uni\FYP\Droplet test data\';
+filePath = append(folder,'4_1_4_1_85bar.mraw');
+backgroundPath = 'A:\Uni\FYP\Droplet test data\pintle_size.mraw'; % DO NOT CHANGE
 outputPath16 = append(folder, 'avgMonoSubFrame.tif');
 outputPathBW = append(folder,'avgMonoSubFrameBW.tif');
 gifPath = append(folder,'bitshift.gif');
@@ -274,10 +274,6 @@ subplot(2,2,4);
 imshow(BW_sauvola, []); hold on;
 visboundaries(edgesCannyClean, 'Color','r');
 title('Spray with Canny Edge Overlay (Cropped)');
-
-
-
-
 
 % Plot spray angle lines over averaged grayscale image
 figure;
