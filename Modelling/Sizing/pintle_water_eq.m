@@ -16,7 +16,7 @@ go = 9.81; % gravitational acceleration (m/s^2)
 % Design points
 T = 3000; % thrust (N)
 Pc = 25; % desired chamber pressure (bar)
-Ps_f = 15; % fuel supply pressure (bar)
+Ps_f = 12.5; % fuel supply pressure (bar)
 Ps_ox = Ps_f; % oxidiser supply pressure (bar)
 Pa = 1.01325; % sea level pressure (bar) 
 OFtarg = 2.5; % desired oxidiser to fuel ratio
@@ -163,7 +163,7 @@ Cd_o = 0.56; % Outer orifice Cd
 Cd_ip = 0.376; % Inner passthrough Cd
 Cd_op = 1; % Outer passthrough Cd
 
-theta_pt = 40; % pintle tip angle (deg, from horizontal)
+theta_pt = 0; % pintle tip angle (deg, from horizontal)
 Dpr = 3; % pintle rod diameter (mm) ## Change this to be a dependent variable later
 Dcg = 4.5; % center gap diameter (mm) #s# Change this to be a dependent variable later
 r_post = Dpt/2; % post diameter radius (mm)
@@ -178,7 +178,7 @@ pass_o_n = 8; % Numberof inner passthrough holes
 A_op = pass_o_n * pass_o_d^2/4 * pi; % Area of inner passthrough holes (mm2)
 
 A_o = 18.6; % Outer orifice area (mm2)
-A_i = pi*id_sleeve*0.79;%65.7*throttle; % Inner orifice area (mm2)
+A_i = pi*id_sleeve*0.75; % 65.7*throttle; % Inner orifice area (mm2)
 
 % Flow conductances
 K_i = Cd_i * A_i / 1e3^2;
@@ -217,7 +217,7 @@ Re_o = rho_f*U_o*Dh_o/mu_f;
 
 % Total momentum ratio
 % Thanks chat for the derivation https://chatgpt.com/share/68ecc095-0eac-8013-bbe3-d4a45ccc6e4e
-TMR = (mox*U_i)/(mf*U_o);
+TMR = (mox*U_i*cosd(theta_pt))/(mox*U_i*sind(theta_pt)+mf*U_o);
 
 % Momentum flux ratio
 J = (rho_f*U_o^2)/(rho_ox*U_i^2);
@@ -232,4 +232,4 @@ We_o = rho_f*U_o^2*Gap_o*1e-3/sigma_f;
 %% Spray Angle Prediction
 
 % Half angle
-theta_spray_half = atand(TMR * cosd(theta_pt)/(TMR * sind(theta_pt) + 1)); % Degrees
+theta_spray_half = atand(TMR); % Degrees

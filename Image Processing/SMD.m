@@ -43,7 +43,7 @@ pintley = 450; % For cropping out pintle
 % SMD
 frameNoSMDstart = 650; % Frame number to start analysing droplets
 frameNoSMDstep = 10; % Frames to step between droplet analysis
-frameNoSMDend = 750; % Frame number to stop analysing droplets
+frameNoSMDend = 650; % Frame number to stop analysing droplets
 maxSMD = 2; % Max SMD to plot for histogram, mm
 percentileThresholdSMD = 20; % threshold for detecting spray, SMD
 connectivity = 4;
